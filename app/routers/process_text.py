@@ -8,7 +8,7 @@ from app.services.gemini import process_text, stream_text
 
 router = APIRouter(prefix="/api/v1", tags=["llm"])
 
-DEFAULT_MODEL = "gemini-2.0-flash"
+DEFAULT_MODEL = "gemini-3.0-flash"
 
 
 class ProcessTextRequest(BaseModel):

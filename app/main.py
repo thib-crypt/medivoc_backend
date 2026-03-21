@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import auth, transcribe, process_text, billing
+from app.routers import auth, transcribe, process_text, billing, dictate
 
 app = FastAPI(
     title="Medivoc API",
@@ -20,6 +20,7 @@ app.include_router(auth.router)
 app.include_router(transcribe.router)
 app.include_router(process_text.router)
 app.include_router(billing.router)
+app.include_router(dictate.router)
 
 
 @app.get("/health", tags=["health"])

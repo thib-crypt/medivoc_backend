@@ -14,6 +14,7 @@
 3. [Endpoints](#endpoints)
    - [Authentification](#authentification-1)
    - [Transcription](#transcription)
+   - [Dictée vocale en temps réel](#dictée-vocale-en-temps-réel)
    - [Traitement LLM](#traitement-llm)
    - [Billing](#billing)
    - [Santé](#santé)
@@ -27,6 +28,7 @@
 
 L'API Medivoc fournit :
 - **Transcription audio** via Groq (Whisper) ou Deepgram (Nova-3)
+- **Dictée vocale en temps réel** via Deepgram (Nova-2) — WebSocket, résultats intermédiaires et finaux
 - **Traitement LLM** via Google Gemini (sync + streaming SSE)
 - **Gestion des quotas** par utilisateur (Free = 30 min/mois, Pro = illimité)
 - **Authentification sécurisée** via Supabase Auth
@@ -127,6 +129,137 @@ curl -X POST \
 
 ---
 
+### Dictée vocale en temps réel
+
+#### `WebSocket /api/v1/dictate`
+Transcription audio en streaming temps réel via Deepgram (Nova-2). La connexion reste ouverte pendant toute la session de dictée.
+
+**Connexion**
+```
+ws://localhost:8000/api/v1/dictate?token=<JWT>&language=fr&interim_results=true
+wss://medivocbackend-production.up.railway.app/api/v1/dictate?token=<JWT>&language=fr
+```
+
+**Query Parameters**
+| Paramètre | Type | Défaut | Description |
+|---|---|---|---|
+| `token` | String | ✅ requis | JWT Supabase (pas de header Bearer possible en WS) |
+| `language` | String | `fr` | Code langue (ex: `fr`, `en-US`, `es`) |
+| `interim_results` | Boolean | `true` | Renvoyer les transcriptions intermédiaires (non finales) |
+
+> **Note** : Le quota de transcription (Free = 30 min/mois) s'applique. La durée est calculée sur la durée réelle de la session.
+
+**Protocole Client → Serveur**
+- **Chunks binaires** : audio PCM 16-bit, mono, 16 kHz (envoi continu)
+- **Message texte JSON** : `{"action": "stop"}` pour terminer proprement la session
+
+**Messages Serveur → Client (JSON)**
+
+| `type` | Champs supplémentaires | Description |
+|---|---|---|
+| `connected` | `message` | Session démarrée avec succès |
+| `transcript` | `is_final`, `speech_final`, `text`, `confidence` | Résultat de transcription |
+| `utterance_end` | — | Fin d'un énoncé détectée |
+| `session_end` | `total_seconds` | Session terminée, résumé de durée |
+| `error` | `message` | Erreur (auth, quota, Deepgram) |
+
+**Exemple de messages reçus**
+```json
+{"type": "connected", "message": "Session de dictée démarrée."}
+{"type": "transcript", "is_final": false, "speech_final": false, "text": "le patient", "confidence": 0.97}
+{"type": "transcript", "is_final": true, "speech_final": true, "text": "le patient présente des douleurs thoraciques.", "confidence": 0.99}
+{"type": "utterance_end"}
+{"type": "session_end", "total_seconds": 34.7}
+```
+
+**Exemple JavaScript (browser)**
+```javascript
+const token = "votre_jwt_token"
+const ws = new WebSocket(`wss://medivocbackend-production.up.railway.app/api/v1/dictate?token=${token}&language=fr`)
+
+ws.onopen = () => {
+  console.log("Session dictée ouverte")
+  // Démarrer la capture micro ici
+  startMicrophone(ws)
+}
+
+ws.onmessage = (event) => {
+  const msg = JSON.parse(event.data)
+  if (msg.type === "transcript" && msg.is_final) {
+    console.log("Final:", msg.text, "| Confiance:", msg.confidence)
+  } else if (msg.type === "transcript") {
+    console.log("Interim:", msg.text)
+  } else if (msg.type === "session_end") {
+    console.log("Durée totale:", msg.total_seconds, "s")
+  } else if (msg.type === "error") {
+    console.error("Erreur:", msg.message)
+  }
+}
+
+// Stopper la session proprement
+function stopDictation() {
+  ws.send(JSON.stringify({ action: "stop" }))
+}
+```
+
+**Exemple Swift / macOS**
+```swift
+import Foundation
+
+class DictationSession: NSObject, URLSessionWebSocketDelegate {
+    private var webSocketTask: URLSessionWebSocketTask?
+    var onTranscript: ((String, Bool) -> Void)?
+
+    func start(token: String, language: String = "fr") {
+        let urlStr = "wss://medivocbackend-production.up.railway.app/api/v1/dictate?token=\(token)&language=\(language)"
+        guard let url = URL(string: urlStr) else { return }
+        let session = URLSession(configuration: .default, delegate: self, delegateQueue: nil)
+        webSocketTask = session.webSocketTask(with: url)
+        webSocketTask?.resume()
+        receiveMessages()
+    }
+
+    func sendAudio(_ data: Data) {
+        webSocketTask?.send(.data(data)) { _ in }
+    }
+
+    func stop() {
+        webSocketTask?.send(.string("{\"action\":\"stop\"}")) { _ in }
+    }
+
+    private func receiveMessages() {
+        webSocketTask?.receive { [weak self] result in
+            switch result {
+            case .success(let message):
+                if case .string(let text) = message,
+                   let data = text.data(using: .utf8),
+                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let type = json["type"] as? String {
+                    if type == "transcript", let transcript = json["text"] as? String {
+                        let isFinal = json["is_final"] as? Bool ?? false
+                        self?.onTranscript?(transcript, isFinal)
+                    }
+                }
+                self?.receiveMessages()
+            case .failure:
+                break
+            }
+        }
+    }
+}
+```
+
+**Format audio attendu**
+- Encoding : PCM 16-bit signé (linear16)
+- Sample rate : 16 000 Hz
+- Canaux : 1 (mono)
+- Taille recommandée des chunks : 4 096 à 8 192 octets (~128–256 ms d'audio)
+
+**Erreurs WebSocket**
+- Connexion refusée (`WS 1008`) : token invalide, quota dépassé, profil introuvable
+
+---
+
 ### Traitement LLM
 
 #### `POST /api/v1/process-text`
@@ -141,7 +274,7 @@ Traite un texte avec Gemini (synchrone).
 {
   "text": "patient avec douleur thoracique",
   "instructions": "Corrige et formate ce texte médical",
-  "model": "gemini-2.0-flash"
+  "model": "gemini-3.0-flash"
 }
 ```
 

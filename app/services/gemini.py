@@ -3,7 +3,7 @@ from typing import AsyncGenerator
 from app.config import settings
 
 GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
-DEFAULT_MODEL = "gemini-2.0-flash"
+DEFAULT_MODEL = "gemini-3.0-flash"
 
 
 def _build_payload(text: str, instructions: str, model: str) -> dict:
