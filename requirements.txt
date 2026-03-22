@@ -11,3 +11,4 @@ mutagen==1.47.0
 python-dateutil==2.9.0
 deepgram-sdk==3.10.0
 websockets==14.1
+stripe

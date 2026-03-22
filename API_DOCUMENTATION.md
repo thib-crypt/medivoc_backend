@@ -365,6 +365,46 @@ Récupère le statut de l'abonnement et l'utilisation.
 }
 ```
 
+#### `POST /billing/checkout`
+Génère une URL de paiement Stripe pour s'abonner au plan Pro.
+
+**Headers requis**
+- `Authorization: Bearer <JWT_TOKEN>`
+
+**Réponse (200 OK)**
+```json
+{
+  "url": "https://checkout.stripe.com/c/pay/cs_test_..."
+}
+```
+
+#### `POST /billing/portal`
+Génère une URL vers le portail client Stripe pour gérer son abonnement.
+
+**Headers requis**
+- `Authorization: Bearer <JWT_TOKEN>`
+
+**Réponse (200 OK)**
+```json
+{
+  "url": "https://billing.stripe.com/p/session/test_..."
+}
+```
+
+#### `POST /billing/webhook`
+Endpoint écoutant les événements Stripe (paiement, annulation) pour mettre à jour la base de données. Ne doit être appelé que par les serveurs Stripe.
+
+**Headers requis**
+- `Stripe-Signature`: Signature cryptographique de Stripe
+
+**Réponse (200 OK)**
+```json
+{
+  "status": "success"
+}
+```
+
+
 ---
 
 ### Santé
