@@ -16,6 +16,7 @@ def create_checkout_session(user_id: str, user_email: str, stripe_customer_id: s
             }
         ],
         "mode": "subscription",
+        "allow_promotion_codes": True,
         "success_url": success_url or f"{settings.frontend_url}/dashboard/billing/success?session_id={{CHECKOUT_SESSION_ID}}",
         "cancel_url": cancel_url or f"{settings.frontend_url}/dashboard/billing",
         "client_reference_id": user_id,
