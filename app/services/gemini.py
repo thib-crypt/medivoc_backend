@@ -6,19 +6,32 @@ GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 DEFAULT_MODEL = "gemini-3.0-flash"
 
 
-def _build_payload(text: str, instructions: str, model: str) -> dict:
+def _build_payload(text: str, instructions: str, model: str, files: list[dict] | None = None) -> dict:
     system_instruction = instructions if instructions else "Tu es un assistant médical expert."
+    
+    parts = []
+    if files:
+        for f in files:
+            parts.append({
+                "inline_data": {
+                    "mime_type": f["mime_type"],
+                    "data": f["data"]
+                }
+            })
+    
+    parts.append({"text": text})
+
     return {
         "system_instruction": {"parts": [{"text": system_instruction}]},
-        "contents": [{"role": "user", "parts": [{"text": text}]}],
+        "contents": [{"role": "user", "parts": parts}],
         "generationConfig": {"temperature": 0.3},
     }
 
 
-async def process_text(text: str, instructions: str = "", model: str = DEFAULT_MODEL) -> str:
+async def process_text(text: str, instructions: str = "", model: str = DEFAULT_MODEL, files: list[dict] | None = None) -> str:
     url = f"{GEMINI_BASE_URL}/{model}:generateContent"
     params = {"key": settings.gemini_api_key}
-    payload = _build_payload(text, instructions, model)
+    payload = _build_payload(text, instructions, model, files)
 
     async with httpx.AsyncClient(timeout=60.0) as client:
         response = await client.post(url, json=payload, params=params)
@@ -32,11 +45,11 @@ async def process_text(text: str, instructions: str = "", model: str = DEFAULT_M
 
 
 async def stream_text(
-    text: str, instructions: str = "", model: str = DEFAULT_MODEL
+    text: str, instructions: str = "", model: str = DEFAULT_MODEL, files: list[dict] | None = None
 ) -> AsyncGenerator[str, None]:
     url = f"{GEMINI_BASE_URL}/{model}:streamGenerateContent"
     params = {"key": settings.gemini_api_key, "alt": "sse"}
-    payload = _build_payload(text, instructions, model)
+    payload = _build_payload(text, instructions, model, files)
 
     async with httpx.AsyncClient(timeout=120.0) as client:
         async with client.stream("POST", url, json=payload, params=params) as response:

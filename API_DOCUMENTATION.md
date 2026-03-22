@@ -263,7 +263,7 @@ class DictationSession: NSObject, URLSessionWebSocketDelegate {
 ### Traitement LLM
 
 #### `POST /api/v1/process-text`
-Traite un texte avec Gemini (synchrone).
+Traite un texte avec Gemini (synchrone). Accepte optionnellement des fichiers joints (images, documents) encodés en base64 pour analyse multimodale.
 
 **Headers requis**
 - `Authorization: Bearer <JWT_TOKEN>`
@@ -274,9 +274,17 @@ Traite un texte avec Gemini (synchrone).
 {
   "text": "patient avec douleur thoracique",
   "instructions": "Corrige et formate ce texte médical",
-  "model": "gemini-3.0-flash"
+  "model": "gemini-3.0-flash",
+  "files": [
+    {
+      "mime_type": "image/jpeg",
+      "data": "/9j/4AAQSkZJRg..."
+    }
+  ]
 }
 ```
+
+> **Note** : Le champ `files` est optionnel. `data` doit contenir la chaîne en Base64 brute du fichier sans le préfixe data URI.
 
 **Réponse (200 OK)**
 ```json
