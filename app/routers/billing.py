@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, Request, HTTPException, status
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from typing import Optional
 from app.dependencies import get_profile, get_current_user
@@ -6,7 +7,6 @@ from app.services import stripe_service
 from app.config import settings
 from app.services.supabase_client import get_supabase
 import stripe
-
 
 class CheckoutRequest(BaseModel):
     success_url: Optional[str] = None
@@ -17,6 +17,68 @@ class PortalRequest(BaseModel):
 
 
 router = APIRouter(prefix="/billing", tags=["billing"])
+
+@router.get("/success")
+async def checkout_success():
+    html_content = """
+    <html>
+        <head>
+            <title>Paiement réussi</title>
+            <meta charset="utf-8">
+            <style>
+                body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; text-align: center; padding: 50px; background: #f9fafb; margin: 0; }
+                h1 { color: #10b981; }
+                p { color: #4b5563; font-size: 18px; }
+                .btn { display: inline-block; padding: 12px 24px; background-color: #3b82f6; color: white; text-decoration: none; border-radius: 8px; font-weight: bold; margin-top: 20px; transition: background 0.2s; }
+                .btn:hover { background-color: #2563eb; }
+            </style>
+            <script>
+                setTimeout(function() {
+                    window.location.href = "medivoc://billing/success";
+                }, 500);
+            </script>
+        </head>
+        <body>
+            <h1>Paiement réussi ! 🎉</h1>
+            <p>Merci pour votre abonnement Medivoc Pro.</p>
+            <p>La page va automatiquement essayer de rouvrir l'application.</p>
+            <br>
+            <a href="medivoc://billing/success" class="btn">Ouvrir Medivoc</a>
+        </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content)
+
+@router.get("/cancel")
+async def checkout_cancel():
+    html_content = """
+    <html>
+        <head>
+            <title>Paiement annulé</title>
+            <meta charset="utf-8">
+            <style>
+                body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; text-align: center; padding: 50px; background: #f9fafb; margin: 0; }
+                h1 { color: #ef4444; }
+                p { color: #4b5563; font-size: 18px; }
+                .btn { display: inline-block; padding: 12px 24px; background-color: #3b82f6; color: white; text-decoration: none; border-radius: 8px; font-weight: bold; margin-top: 20px; transition: background 0.2s; }
+                .btn:hover { background-color: #2563eb; }
+            </style>
+            <script>
+                setTimeout(function() {
+                    window.location.href = "medivoc://billing/cancel";
+                }, 500);
+            </script>
+        </head>
+        <body>
+            <h1>Paiement annulé</h1>
+            <p>Votre processus d'abonnement n'a pas été finalisé.</p>
+            <p>La page va automatiquement essayer de rouvrir l'application.</p>
+            <br>
+            <a href="medivoc://billing/cancel" class="btn">Retour à Medivoc</a>
+        </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content)
 
 
 @router.get("/status")
