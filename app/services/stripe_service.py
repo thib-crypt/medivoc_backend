@@ -3,7 +3,7 @@ from app.config import settings
 
 stripe.api_key = settings.stripe_secret_key
 
-def create_checkout_session(user_id: str, user_email: str, stripe_customer_id: str = None):
+def create_checkout_session(user_id: str, user_email: str, stripe_customer_id: str = None, success_url: str = None, cancel_url: str = None):
     """
     Crée une session de paiement Stripe pour le plan Pro.
     """
@@ -16,8 +16,8 @@ def create_checkout_session(user_id: str, user_email: str, stripe_customer_id: s
             }
         ],
         "mode": "subscription",
-        "success_url": f"{settings.frontend_url}/dashboard/billing/success?session_id={{CHECKOUT_SESSION_ID}}",
-        "cancel_url": f"{settings.frontend_url}/dashboard/billing",
+        "success_url": success_url or f"{settings.frontend_url}/dashboard/billing/success?session_id={{CHECKOUT_SESSION_ID}}",
+        "cancel_url": cancel_url or f"{settings.frontend_url}/dashboard/billing",
         "client_reference_id": user_id,
         "customer_email": user_email if not stripe_customer_id else None,
         "customer": stripe_customer_id if stripe_customer_id else None,
@@ -30,13 +30,13 @@ def create_checkout_session(user_id: str, user_email: str, stripe_customer_id: s
     return session.url
 
 
-def create_customer_portal_session(stripe_customer_id: str):
+def create_customer_portal_session(stripe_customer_id: str, return_url: str = None):
     """
     Crée une session pour le portail client Stripe (gestion d'abonnement).
     """
     session = stripe.billing_portal.Session.create(
         customer=stripe_customer_id,
-        return_url=f"{settings.frontend_url}/dashboard/billing",
+        return_url=return_url or f"{settings.frontend_url}/dashboard/billing",
     )
     return session.url
 

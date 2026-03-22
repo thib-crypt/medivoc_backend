@@ -1,9 +1,20 @@
 from fastapi import APIRouter, Depends, Request, HTTPException, status
+from pydantic import BaseModel
+from typing import Optional
 from app.dependencies import get_profile, get_current_user
 from app.services import stripe_service
 from app.config import settings
 from app.services.supabase_client import get_supabase
 import stripe
+
+
+class CheckoutRequest(BaseModel):
+    success_url: Optional[str] = None
+    cancel_url: Optional[str] = None
+
+class PortalRequest(BaseModel):
+    return_url: Optional[str] = None
+
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 
@@ -19,7 +30,7 @@ async def get_billing_status(profile=Depends(get_profile)):
 
 
 @router.post("/checkout")
-async def create_checkout(profile=Depends(get_profile), user=Depends(get_current_user)):
+async def create_checkout(request_data: CheckoutRequest, profile=Depends(get_profile), user=Depends(get_current_user)):
     if not settings.stripe_secret_key:
         raise HTTPException(status_code=500, detail="Stripe is not configured.")
         
@@ -31,7 +42,9 @@ async def create_checkout(profile=Depends(get_profile), user=Depends(get_current
         checkout_url = stripe_service.create_checkout_session(
             user_id=user_id,
             user_email=user_email,
-            stripe_customer_id=stripe_customer_id
+            stripe_customer_id=stripe_customer_id,
+            success_url=request_data.success_url,
+            cancel_url=request_data.cancel_url
         )
         return {"url": checkout_url}
     except Exception as e:
@@ -39,7 +52,7 @@ async def create_checkout(profile=Depends(get_profile), user=Depends(get_current
 
 
 @router.post("/portal")
-async def create_portal(profile=Depends(get_profile)):
+async def create_portal(request_data: PortalRequest, profile=Depends(get_profile)):
     if not settings.stripe_secret_key:
         raise HTTPException(status_code=500, detail="Stripe is not configured.")
         
@@ -48,7 +61,10 @@ async def create_portal(profile=Depends(get_profile)):
         raise HTTPException(status_code=400, detail="Aucun client Stripe actif trouvé.")
         
     try:
-        portal_url = stripe_service.create_customer_portal_session(stripe_customer_id)
+        portal_url = stripe_service.create_customer_portal_session(
+            stripe_customer_id,
+            return_url=request_data.return_url
+        )
         return {"url": portal_url}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
